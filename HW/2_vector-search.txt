@@ -1,0 +1,230 @@
+Ran these from the codespaces terminal due to ModuleNotFoundError: No module named 'onnxruntime'
+Requirement already satisfied: onnxruntime in /usr/local/python/3.12.1/lib/python3.12/site-packages (1.27.0)
+
+
+From Terminal :
+     uv run python q*.py
+
+#Q1:
+import numpy as np
+from embedder import Embedder
+
+def main():
+    print("Initializing embedder...")
+    embedder = Embedder()
+    
+    query = "How does approximate nearest neighbor search work?"
+    v = embedder.encode(query)
+    
+    print("\n--- Results ---")
+    print(f"Vector length: {len(v)}")
+    print(f"First value (v[0]): {v[0]:.4f}")
+
+if __name__ == "__main__":
+    main()
+
+ANSWER:
+--- Results ---
+Vector length: 384
+First value (v[0]): -0.0206
+
+#Q2:
+import numpy as np
+from gitsource import GithubRepositoryDataReader
+from embedder import Embedder
+embedder = Embedder()
+query = "How does approximate nearest neighbor search work?"
+v_query = embedder.encode(query)
+reader = GithubRepositoryDataReader(
+    repo_owner="DataTalksClub",
+    repo_name="llm-zoomcamp",
+    commit_id="8c1834d",
+    allowed_extensions={"md"},
+    filename_filter=lambda path: "/lessons/" in path,
+)
+documents = [file.parse() for file in reader.read()]
+target_file = "02-vector-search/lessons/07-sqlitesearch-vector.md"
+doc_content = next(doc['content'] for doc in documents if doc['filename'] == target_file)
+v_doc = embedder.encode(doc_content)
+similarity = np.dot(v_query, v_doc)
+print(f"Cosine Similarity: {similarity:.2f}")
+
+ANSWER:
+Cosine Similarity: 0.36
+
+#Q3:
+import numpy as np
+from gitsource import GithubRepositoryDataReader, chunk_documents
+from embedder import Embedder
+
+def main():
+    print("Loading embedder and data...")
+    embedder = Embedder()
+    query = "How does approximate nearest neighbor search work?"
+    v_query = embedder.encode(query)
+    reader = GithubRepositoryDataReader(
+        repo_owner="DataTalksClub",
+        repo_name="llm-zoomcamp",
+        commit_id="8c1834d",
+        allowed_extensions={"md"},
+        filename_filter=lambda path: "/lessons/" in path,
+    )
+    documents = [file.parse() for file in reader.read()]
+    chunks = chunk_documents(documents, size=2000, step=1000)
+    print(f"Total chunks created: {len(chunks)}")
+    print("Encoding chunks...")
+    chunk_embeddings = [embedder.encode(chunk['content']) for chunk in chunks]
+    X = np.array(chunk_embeddings)
+    scores = X.dot(v_query)
+    best_idx = np.argmax(scores)
+    print("\n--- Top Chunk Result ---")
+    print(f"Filename: {chunks[best_idx]['filename']}")
+    print(f"Score:    {scores[best_idx]:.4f}")
+
+if __name__ == "__main__":
+    main()
+
+ANSWER:
+Loading embedder and data...
+Total chunks created: 295
+Encoding chunks...
+
+--- Top Chunk Result ---
+Filename: 02-vector-search/lessons/07-sqlitesearch-vector.md
+Score:    0.6489
+
+#Q4:
+
+import numpy as np
+from gitsource import GithubRepositoryDataReader, chunk_documents
+from embedder import Embedder
+import minsearch
+def main():
+    embedder = Embedder()
+    reader = GithubRepositoryDataReader(
+        repo_owner="DataTalksClub",
+        repo_name="llm-zoomcamp",
+        commit_id="8c1834d",
+        allowed_extensions={"md"},
+        filename_filter=lambda path: "/lessons/" in path,
+    )
+    documents = [file.parse() for file in reader.read()]
+    chunks = chunk_documents(documents, size=2000, step=1000)
+    print("Encoding chunks...")
+    embeddings = [embedder.encode(chunk['content']) for chunk in chunks]
+    X = np.array(embeddings)
+    index = minsearch.VectorSearch()
+    index.fit(X, chunks)  # <--- Passes both arguments now!
+    query = "What metric do we use to evaluate a search engine?"
+    v_query = embedder.encode(query)
+    results = index.search(v_query, num_results=1)
+    print("\n--- Top Search Result ---")
+    if results:
+        print(f"Filename: {results[0]['filename']}")
+    else:
+        print("No results found.")
+
+if __name__ == "__main__":
+    main()
+
+ANSWER:
+Encoding chunks...
+
+--- Top Search Result ---
+Filename: 04-evaluation/lessons/05-search-metrics.md
+
+#Q5:
+import numpy as np
+from gitsource import GithubRepositoryDataReader, chunk_documents
+from embedder import Embedder
+import minsearch
+def main():
+    embedder = Embedder()
+    reader = GithubRepositoryDataReader(
+        repo_owner="DataTalksClub",
+        repo_name="llm-zoomcamp",
+        commit_id="8c1834d",
+        allowed_extensions={"md"},
+        filename_filter=lambda path: "/lessons/" in path,
+    )
+    documents = [file.parse() for file in reader.read()]
+    chunks = chunk_documents(documents, size=2000, step=1000)
+    text_index = minsearch.Index(
+        text_fields=["content"],
+        keyword_fields=[]
+    )
+    text_index.fit(chunks)
+     embeddings = [embedder.encode(chunk['content']) for chunk in chunks]
+    X = np.array(embeddings)
+    vector_index = minsearch.VectorSearch()
+    vector_index.fit(X, chunks)
+    query = "How do I store vectors in PostgreSQL?"
+    v_query = embedder.encode(query)
+    text_results = text_index.search(query, num_results=5)
+    vector_results = vector_index.search(v_query, num_results=5)
+    text_filenames = set(doc['filename'] for doc in text_results)
+    vector_filenames = set(doc['filename'] for doc in vector_results)
+    diff = vector_filenames - text_filenames   
+    print("\n--- Files only in Vector Results ---")
+    for f in diff:
+        print(f)
+
+if __name__ == "__main__":
+    main()
+
+ANSWER:
+
+--- Files only in Vector Results ---
+02-vector-search/lessons/08-pgvector.md
+
+#Q6:
+
+import numpy as np
+from gitsource import GithubRepositoryDataReader, chunk_documents
+from embedder import Embedder
+import minsearch
+def rrf(result_lists, k=60, num_results=5):
+    scores = {}
+    docs = {}
+    for results in result_lists:
+        for rank, doc in enumerate(results):
+            key = (doc["filename"], doc["start"])
+            scores[key] = scores.get(key, 0) + 1 / (k + rank)
+            docs[key] = doc
+    ranked = sorted(scores, key=scores.get, reverse=True)
+    return [docs[key] for key in ranked[:num_results]]
+def main():
+    embedder = Embedder()
+    reader = GithubRepositoryDataReader(
+        repo_owner="DataTalksClub",
+        repo_name="llm-zoomcamp",
+        commit_id="8c1834d",
+        allowed_extensions={"md"},
+        filename_filter=lambda path: "/lessons/" in path,
+    )
+    documents = [file.parse() for file in reader.read()]
+    chunks = chunk_documents(documents, size=2000, step=1000)
+    text_index = minsearch.Index(text_fields=["content"], keyword_fields=[])
+    text_index.fit(chunks)
+    embeddings = [embedder.encode(chunk['content']) for chunk in chunks]
+    X = np.array(embeddings)
+    vector_index = minsearch.VectorSearch()
+    vector_index.fit(X, chunks)
+    query = "How do I give the model access to tools?"
+    v_query = embedder.encode(query)
+    text_results = text_index.search(query, num_results=10)
+    vector_results = vector_index.search(v_query, num_results=10)
+    hybrid_results = rrf([vector_results, text_results], k=60, num_results=5) 
+    print("\n--- Top Hybrid Search Result After RRF ---")
+    if hybrid_results:
+        print(f"Filename: {hybrid_results[0]['filename']}")
+        print(f"Start offset: {hybrid_results[0].get('start')}")
+    else:
+        print("No results found.")
+if __name__ == "__main__":
+    main()
+
+ANSWER:
+--- Top Hybrid Search Result After RRF ---
+Filename: 01-agentic-rag/lessons/13-function-calling.md
+Start offset: 4000
