@@ -1,0 +1,54 @@
+Question 1: 
+Answer: AI Copilot has access to current Kestra plugin documentation
+
+Question 2: RAG vs No RAG
+Answer: Vague, generic, or fabricated — the model guesses from training data
+
+Question 3: Token usage — short summary  
+Answer: 200-400 tokens  
+Token Usage Summary:
+
+Multilingual Agent:
+- Input tokens: 282
+- Output tokens: 83
+- Total tokens: 365
+English Brevity Agent:
+- Input tokens: 98
+- Output tokens: 43
+- Total tokens: 141
+
+Question 4: Token usage — long summary  
+Answer: 2-5x more  as it is greater than 20 % 
+
+Multilingual Agent:
+- Input tokens: 282
+- Output tokens: 176
+- Total tokens: 458
+English Brevity Agent:
+- Input tokens: 191
+- Output tokens: 42
+- Total tokens: 233
+
+
+Question 5: Modifying a flow  
+Open 4_simple_agent.yaml in the Kestra flow editor. 
+  - id: english_brevity
+    type: io.kestra.plugin.ai.agent.AIAgent
+    prompt: |
+      Generate exactly 3 sentences English summary of the following:
+Multilingual Agent:
+- Input tokens: 282
+- Output tokens: 159
+- Total tokens: 441
+
+English Brevity Agent:
+- Input tokens: 174
+- Output tokens: 106
+- Total tokens: 280
+
+280/141 ~ 1.99
+
+Answer: 2-4x more  
+
+Question 6: 
+Answer: Use traditional task-based workflows for predictability and auditability
