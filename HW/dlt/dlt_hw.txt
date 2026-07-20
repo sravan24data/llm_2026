@@ -1,0 +1,96 @@
+#Q1: main.py
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from agent import faq_agent, SearchDeps
+from ingest import build_index, load_faq_data
+
+
+def main():
+    # Download the FAQ and build the search index
+    documents = load_faq_data()
+    index = build_index(documents)
+
+    # Inject the index into the agent via the dependency container
+    deps = SearchDeps(index=index)
+
+    # Ask a question. run_sync blocks until the agent is done;
+    # the agent may call search multiple times before answering.
+    # Homework Q1 trace question
+    question = 'How do I run Ollama locally?'
+    # question = 'I just discovered the course. Can I join it?'
+    result = faq_agent.run_sync(question, deps=deps)
+
+    print(result.output)
+
+
+if __name__ == '__main__':
+    main()
+
+
+#Q2: ingest.py
+import os
+
+import dlt
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@dlt.resource(
+    name="spans",
+    write_disposition="append",
+)
+def logfire_spans():
+    import requests
+
+    token = os.environ["LOGFIRE_READ_TOKEN"]
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+    }
+
+    url = "https://logfire-us.pydantic.dev/v1/projects/traces"
+
+    response = requests.get(
+        url,
+        headers=headers,
+        timeout=30,
+    )
+
+    response.raise_for_status()
+
+    for item in response.json():
+        yield item
+
+
+pipeline = dlt.pipeline(
+    pipeline_name="agent_traces",
+    destination="duckdb",
+    dataset_name="agent_traces",
+)
+
+
+if __name__ == "__main__":
+    load_info = pipeline.run(logfire_spans())
+    print(load_info)
+
+#####   
+#DuckDB:  
+SELECT COUNT(*) 
+FROM information_schema.tables
+WHERE table_schema = 'agent_traces';
+
+#Q3:
+
+SELECT *
+FROM agent_traces.spans_attributes
+WHERE key LIKE '%input_tokens%'
+LIMIT 10;
+
+SELECT 
+    SUM(CAST(value AS INTEGER)) AS total_input_tokens
+FROM agent_traces.spans_attributes
+WHERE key = 'gen_ai.usage.input_tokens'
+AND trace_id = '5t3a91c4e8b24a9c9a6c5b2e3d4f8a10';
